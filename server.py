@@ -7,7 +7,9 @@ from urllib.parse import quote_plus, urlencode
 
 from authlib.integrations.flask_client import OAuth
 from dotenv import find_dotenv, load_dotenv
-from flask import Flask, redirect, render_template, session, url_for
+from flask import *
+import psycopg2
+import os
 
 
 ENV_FILE = find_dotenv()
@@ -64,6 +66,37 @@ def logout():
             quote_via=quote_plus,
         )
     )
+
+
+@app.route("/api/results")
+def results():
+    # Connect to the database and retrieve the survey results
+    conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
+    cur = conn.cursor()
+
+    order = "ASC" if request.args.get("reverse") != "true" else "DESC"
+    cur.execute(f"SELECT * FROM survey_responses ORDER BY id {order}")
+    results = cur.fetchall()
+
+    # Convert the results to a list of dictionaries
+    results_list = [
+        {
+            "id": r[0],
+            "customer": r[1],
+            "breeder": r[2],
+            "rating": r[3],
+            "recommend": r[4],
+            "comments": r[5],
+        }
+        for r in results
+    ]
+
+    # Close the database connection
+    cur.close()
+    conn.close()
+
+    # Return the results as JSON
+    return jsonify(results_list)
 
 
 if __name__ == "__main__":
